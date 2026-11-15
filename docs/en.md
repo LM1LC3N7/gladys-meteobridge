@@ -16,14 +16,16 @@ built from the official wiki of Meteobridge (pages "Add-On Services" and
 One Gladys device per gateway (identified by its MAC address), with a
 feature for each value the gateway gave at least once:
 
-- outdoor temperature, humidity and dew point; wind chill;
+- outdoor temperature, humidity and dew point; wind chill (the outdoor values
+  are probes: they never enter the room temperature average of Gladys);
 - indoor temperature and humidity (console);
 - pressure at sea level and at the station (hPa);
-- average wind speed and gust (km/h), wind direction (degrees);
+- average wind speed and wind speed (`wind0wind`, shown as the gust) in km/h,
+  wind direction (degrees);
 - rain rate (mm/h) and rain of the day since midnight (mm, time of the gateway);
 - UV index, solar radiation (shown in lux: 1 W/m² ≈ 126.6 lx, the core has no
   W/m² unit);
-- PM2.5 (µg/m³);
+- particulate matter (`air0pm`, µg/m³, shown as PM2.5);
 - the extra temperature and humidity sensors 1 to 8;
 - low batteries (outdoor sensor, anemometer, rain gauge, console).
 
@@ -53,8 +55,10 @@ seconds.
 
 - A sensor the gateway has not heard for its hold time is written `--` by the
   gateway: the value stays unknown in Gladys, it is never published as 0. A
-  text, an empty value or a value out of bounds is left out too.
-- The rain of the day is published only while the rain gauge itself is current.
+  text, an empty value, a value out of bounds or a humidity of 0 % (a console
+  without a sensor) is left out too.
+- The rain of the day is published only while the rain gauge itself is heard
+  (its rain rate is current).
 - A reading is published for twice the interval (5 minutes at least, 2 hours
   at most); past it, nothing old is sent again.
 - Another gateway answering at the same address (another MAC address) becomes
@@ -70,7 +74,8 @@ gateway to the Internet. The password is never written in a log, a status nor
 in `/data`; a redirection is never followed.
 
 If the gateway refuses the user name or the password (HTTP 401), the
-integration stops: it never sends them again by itself. Correct them and save
+integration stops: it never sends them again by itself (not after a restart,
+nor when they are typed again after a field was emptied). Correct them and save
 (they are then tried within 15 seconds), or click **Test the Meteobridge**
 (one try per interval). After a restart, `/data` keeps only 8 bits of a
 salted fingerprint of the refused credentials, enough not to send the same ones

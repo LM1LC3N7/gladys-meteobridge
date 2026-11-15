@@ -58,11 +58,24 @@ export function parseAddress(text) {
   if (value.length > 253) {
     return null;
   }
-  if (IPV4.test(value)) {
-    return forbiddenIpv4(value) ? null : `${value}${port}`;
+  // The host as fetch will read it (WHATWG URL): "0xffffffff", "3232235826",
+  // "0300.0250.1.1" or "1.2.3.0xff" are IPv4 addresses there. Only the
+  // canonical dotted form of an IPv4 address is accepted, so the bounds
+  // below hold on the address really used.
+  let host;
+  try {
+    host = new URL(`http://${value}/`).hostname;
+  } catch {
+    return null;
+  }
+  if (IPV4.test(host)) {
+    return host === value && !forbiddenIpv4(host) ? `${value}${port}` : null;
   }
   const labels = value.split('.');
-  const ok = !/^[\d.]+$/.test(value) && labels.every((l) => LABEL.test(l));
+  const ok =
+    host === value &&
+    labels.every((l) => LABEL.test(l)) &&
+    !/^(\d+|0x[0-9a-f]*)$/.test(labels.at(-1));
   return ok ? `${value}${port}` : null;
 }
 

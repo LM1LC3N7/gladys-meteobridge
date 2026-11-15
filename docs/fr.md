@@ -16,14 +16,17 @@ votre réseau local, sans le cloud.
 Un appareil Gladys par passerelle (repérée par son adresse MAC), avec une
 fonctionnalité pour chaque valeur que la passerelle a donnée au moins une fois :
 
-- température, humidité et point de rosée extérieurs ; refroidissement éolien ;
+- température, humidité et point de rosée extérieurs ; refroidissement éolien
+  (les valeurs extérieures sont des sondes : elles n'entrent jamais dans la
+  moyenne de température de la pièce dans Gladys) ;
 - température et humidité intérieures (console) ;
 - pression au niveau de la mer et à la station (hPa) ;
-- vitesse moyenne du vent et rafale (km/h), direction du vent (degrés) ;
+- vitesse moyenne du vent et vitesse du vent (`wind0wind`, affichée comme la
+  rafale) en km/h, direction du vent (degrés) ;
 - intensité de pluie (mm/h) et pluie du jour depuis minuit (mm, heure de la passerelle) ;
 - indice UV, rayonnement solaire (affiché en lux : 1 W/m² ≈ 126,6 lx, le cœur n'a
   pas d'unité W/m²) ;
-- PM2.5 (µg/m³) ;
+- particules fines (`air0pm`, µg/m³, affichées comme PM2.5) ;
 - les capteurs supplémentaires de température et d'humidité 1 à 8 ;
 - les piles faibles (capteur extérieur, anémomètre, pluviomètre, console).
 
@@ -54,9 +57,10 @@ configuration, sont essayés dans les 15 secondes.
 
 - Un capteur que la passerelle n'a pas entendu depuis son délai de maintien est
   écrit `--` par la passerelle : la valeur reste inconnue dans Gladys, elle
-  n'est jamais publiée comme 0. Un texte, une valeur vide ou hors bornes est
-  écarté aussi.
-- La pluie du jour n'est publiée que tant que le pluviomètre lui-même est à jour.
+  n'est jamais publiée comme 0. Un texte, une valeur vide, hors bornes ou une
+  humidité de 0 % (console sans capteur) est écarté aussi.
+- La pluie du jour n'est publiée que tant que le pluviomètre lui-même est
+  entendu (son intensité de pluie est à jour).
 - Une mesure est publiée pendant deux intervalles (5 minutes au moins, 2 heures
   au plus) ; au-delà, rien d'ancien n'est renvoyé.
 - Une autre passerelle qui répond à la même adresse (autre adresse MAC) devient
@@ -72,7 +76,8 @@ N'exposez jamais la passerelle sur Internet. Le mot de passe n'est jamais écrit
 dans un journal, un statut ni dans `/data` ; une redirection n'est jamais suivie.
 
 Si la passerelle refuse le nom d'utilisateur ou le mot de passe (HTTP 401),
-l'intégration s'arrête : elle ne les renvoie jamais d'elle-même. Corrigez-les et
+l'intégration s'arrête : elle ne les renvoie jamais d'elle-même (ni après un
+redémarrage, ni quand ils sont ressaisis après avoir vidé un champ). Corrigez-les et
 enregistrez (ils sont alors essayés dans les 15 secondes), ou cliquez sur
 **Tester le Meteobridge** (un essai par intervalle). Après un redémarrage,
 `/data` ne garde que 8 bits d'une empreinte salée des identifiants refusés,

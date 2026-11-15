@@ -11,9 +11,11 @@
 //
 // The selector `act` is the most recent value, invalid once the sensor has
 // not been heard for its hold time: the gateway then writes the replacement
-// `--`, which stays unknown here (never 0). The rain of the day (`sumday`)
-// is an aggregate that never goes invalid: it is published only while the
-// rain gauge itself is current (`rain0total-act`, its gate).
+// `--`, which stays unknown here (never 0). The rain of the day
+// (`rain0total-sumday`: the wiki reads the cumulative `rain0total` with sum
+// selectors only) never goes invalid: it is published only while the rain
+// gauge itself is heard, i.e. while its rate (`rain0rate-act`, not
+// cumulative) is current: its gate.
 //
 // The feature key is a name of this integration (`temperature`,
 // `rain_today`...), never a tag: it is part of the external id, so it never
@@ -52,8 +54,10 @@ export const KINDS = {
     max: 70,
     convert: (v) => round(v, 1),
   },
-  // An extra sensor is often a probe (pool, greenhouse, water tank): kept
-  // out of the room temperature average of Gladys.
+  // Outdoor values (temperature, dew point, wind chill) and the extra
+  // sensors (pool, greenhouse, water tank): kept out of the room temperature
+  // average of Gladys; only the indoor temperature of the console is a room
+  // temperature.
   probe: {
     category: CAT.TEMPERATURE_SENSOR,
     type: TYPES.TEMPERATURE_SENSOR.PROBE,
@@ -66,7 +70,8 @@ export const KINDS = {
     category: CAT.HUMIDITY_SENSOR,
     type: TYPES.SENSOR.DECIMAL,
     unit: UNITS.PERCENT,
-    min: 0,
+    // 0 % is a console without a sensor, never a real reading.
+    min: 1,
     max: 100,
     convert: (v) => round(v, 1),
   },
@@ -158,9 +163,9 @@ export const KINDS = {
  * wetness (left out of this version).
  */
 export const FIELDS = [
-  ['temperature', 'th0temp-act', 'temperature', 'Outdoor temperature'],
+  ['temperature', 'th0temp-act', 'probe', 'Outdoor temperature'],
   ['humidity', 'th0hum-act', 'humidity', 'Outdoor humidity'],
-  ['dew_point', 'th0dew-act', 'temperature', 'Dew point'],
+  ['dew_point', 'th0dew-act', 'probe', 'Dew point'],
   ['indoor_temperature', 'thb0temp-act', 'temperature', 'Indoor temperature'],
   ['indoor_humidity', 'thb0hum-act', 'humidity', 'Indoor humidity'],
   ['pressure', 'thb0seapress-act', 'pressure', 'Pressure (sea level)'],
@@ -168,12 +173,12 @@ export const FIELDS = [
   ['wind_speed', 'wind0avgwind-act', 'wind', 'Wind speed (average)'],
   ['wind_gust', 'wind0wind-act', 'wind', 'Wind gust'],
   ['wind_direction', 'wind0dir-act', 'direction', 'Wind direction'],
-  ['wind_chill', 'wind0chill-act', 'temperature', 'Wind chill'],
+  ['wind_chill', 'wind0chill-act', 'probe', 'Wind chill'],
   ['rain_rate', 'rain0rate-act', 'rainRate', 'Rain rate'],
-  ['rain_today', 'rain0total-sumday', 'rainDay', 'Rain today', 'rain0total-act'],
+  ['rain_today', 'rain0total-sumday', 'rainDay', 'Rain today', 'rain0rate-act'],
   ['uv_index', 'uv0index-act', 'uv', 'UV index'],
   ['solar_radiation', 'sol0rad-act', 'solar', 'Solar radiation'],
-  ['pm25', 'air0pm-act', 'pm25', 'PM2.5'],
+  ['pm25', 'air0pm-act', 'pm25', 'Particulate matter (PM2.5)'],
   ...[1, 2, 3, 4, 5, 6, 7, 8].flatMap((n) => [
     [`extra_temperature_${n}`, `th${n}temp-act`, 'probe', `Extra temperature ${n}`],
     [`extra_humidity_${n}`, `th${n}hum-act`, 'humidity', `Extra humidity ${n}`],

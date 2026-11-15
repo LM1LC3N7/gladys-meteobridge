@@ -36,7 +36,6 @@ export const SENSORS = {
   'wind0dir-act': '263.0',
   'wind0chill-act': '11.0',
   'rain0rate-act': '1.2',
-  'rain0total-act': '1234.5',
   'rain0total-sumday': '3.4',
   'uv0index-act': '2.6',
   'sol0rad-act': '400.0',

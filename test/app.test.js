@@ -190,9 +190,9 @@ test('"--", text, a comma or an empty value is unknown, never 0; out of bounds l
   assert.equal(gladys.fake.lastState(F('dew_point')), 9.1);
 });
 
-test('the rain of the day is published only while the rain gauge is current', async (t) => {
+test('the rain of the day is published only while the rain gauge is heard (its rate current)', async (t) => {
   gw = installFetch();
-  gw.sensors['rain0total-act'] = '--';
+  gw.sensors['rain0rate-act'] = '--';
   const { gladys } = await setup(t, { devices: [createdDevice()] });
   assert.equal(gladys.fake.lastState(F('rain_today')), undefined);
 });
@@ -314,8 +314,10 @@ test('refused: a restart with the same credentials does not try them; new ones a
   const salt = stateFile(dataDir).refused.salt;
   const tag = stateFile(dataDir).refused.tag;
   for (let i = 1; tagOf(salt, normalizeConfig({ ...CONFIG, password: other })) === tag; i += 1) {
+    assert.ok(i < 1000, 'the 8-bit tag never differs: broken');
     other = `Another-Pw-${i}`;
   }
+
   const fixed = await setup(t, { dir: dataDir, clock, config: { ...CONFIG, password: other } });
   await clock.advance(MIN_GAP + SECOND);
   assert.equal(gw.calls.length, 2);
@@ -496,8 +498,9 @@ test('getConfig() failing in `connected`: retried with a growing wait, then the 
   await clock.advance(10 * SECOND + 1);
   assert.equal(gw.calls.length, 0);
   await clock.advance(20 * SECOND + 1);
+  // The start after the retry loads /data (real I/O): wait for its read.
+  await until(() => gw.calls.length === 1);
   await app.reading;
-  assert.equal(gw.calls.length, 1);
   assert.equal(status(gladys).connected, true);
 });
 
@@ -605,4 +608,227 @@ test('shutdown writes /data and stops every timer', async (t) => {
   await clock.advance(HOUR);
   assert.equal(gw.calls.length, 1);
   assert.deepEqual(clock.pending(), []);
+});
+
+// --- Review r1: lifecycle, abort, identity of the features ---------------------------
+
+/** Wait (real time, bounded) for a condition the real /data I/O makes true. */
+async function until(condition, ms = 5000) {
+  const end = Date.now() + ms;
+  while (!condition() && Date.now() < end) {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  assert.ok(condition(), 'condition not met in time');
+}
+
+test('stop() while getConfig() is pending: its late answer starts nothing, no timer is left', async (t) => {
+  gw = installFetch();
+  const { app, gladys, clock } = await setup(t, { connect: false, listen: false });
+  await gladys.connect();
+  let answer;
+  t.mock.method(
+    gladys,
+    'getConfig',
+    () =>
+      new Promise((resolve, reject) => {
+        answer = { resolve, reject };
+      }),
+  );
+  const late = app.connected();
+  await clock.settle();
+  await app.stop();
+  answer.resolve(CONFIG);
+  await late;
+  await clock.advance(10 * MINUTE);
+  assert.equal(gw.calls.length, 0, 'disconnected: nothing read');
+  assert.deepEqual(clock.pending(), []);
+  // A failure after stop(): no retry armed.
+  const failing = app.connected();
+  await clock.settle();
+  await app.stop();
+  answer.reject(new Error('timeout'));
+  await failing;
+  assert.deepEqual(clock.pending(), []);
+  await clock.advance(HOUR);
+  assert.equal(gw.calls.length, 0);
+});
+
+test('a configuration saved while getConfig() is pending wins over its late answer', async (t) => {
+  gw = installFetch();
+  const { app, gladys, clock } = await setup(t, { connect: false, listen: false });
+  await gladys.connect();
+  let resolveLate;
+  t.mock.method(gladys, 'getConfig', () => new Promise((resolve) => (resolveLate = resolve)));
+  const late = app.connected();
+  await clock.settle();
+  await app.start({ ...CONFIG, address: '192.168.1.51' });
+  resolveLate(CONFIG);
+  await late;
+  await app.reading;
+  await clock.advance(30 * SECOND);
+  assert.ok(gw.calls.length >= 1);
+  assert.ok(gw.calls.every((c) => new URL(c.url).hostname === '192.168.1.51'));
+});
+
+test('getConfig() retries wait 10, 20, then 40 s, and start again from 10 s after a success', async (t) => {
+  gw = installFetch();
+  const { app, gladys, clock } = await setup(t, { connect: false, listen: false });
+  await gladys.connect();
+  const real = gladys.getConfig.bind(gladys);
+  let fail = 3;
+  let asked = 0;
+  t.mock.method(gladys, 'getConfig', async () => {
+    asked += 1;
+    if (fail > 0) {
+      fail -= 1;
+      throw new Error('timeout');
+    }
+    return real();
+  });
+  await app.connected();
+  assert.equal(asked, 1);
+  await clock.advance(10 * SECOND - 100);
+  assert.equal(asked, 1);
+  await clock.advance(200);
+  assert.equal(asked, 2);
+  await clock.advance(20 * SECOND - 300);
+  assert.equal(asked, 2);
+  await clock.advance(400);
+  assert.equal(asked, 3);
+  await clock.advance(40 * SECOND - 400);
+  assert.equal(asked, 3);
+  await clock.advance(400);
+  assert.equal(asked, 4);
+  await until(() => gw.calls.length === 1);
+  await app.reading;
+  fail = 1;
+  await app.connected();
+  assert.equal(asked, 5);
+  await clock.advance(10 * SECOND + 100);
+  assert.equal(asked, 6, 'the wait starts again from 10 s');
+});
+
+test('stop() during a read aborts the request at once (never waits for the gateway)', async (t) => {
+  gw = installFetch(
+    (call) =>
+      new Promise((resolve, reject) => {
+        const fail = () => reject(new DOMException('aborted', 'AbortError'));
+        call.init.signal.addEventListener('abort', fail);
+        // Safety net so that a broken abort fails the test instead of hanging it.
+        setTimeout(fail, 3000).unref();
+      }),
+  );
+  const clock = createClock(START);
+  const { app, gladys } = await setup(t, { clock, connect: false });
+  const connecting = gladys.connect();
+  await until(() => gw.calls.length === 1);
+  const outcome = await Promise.race([
+    app.stop().then(() => 'stopped'),
+    new Promise((resolve) => setTimeout(() => resolve('hung'), 2000).unref()),
+  ]);
+  assert.equal(outcome, 'stopped');
+  await connecting;
+});
+
+test('a configuration saved while the attempt is being written: nothing leaves for the old one', async (t) => {
+  gw = installFetch();
+  const fs = await import('node:fs/promises');
+  let releaseWrite;
+  let block = true;
+  const fake = {
+    readFile: fs.readFile,
+    mkdir: fs.mkdir,
+    rename: fs.rename,
+    writeFile: async (...args) => {
+      if (block) {
+        block = false;
+        await new Promise((resolve) => (releaseWrite = resolve));
+      }
+      return fs.writeFile(...args);
+    },
+  };
+  const clock = createClock(START);
+  const { app, gladys } = await setup(t, { clock, fs: fake, connect: false });
+  const connecting = gladys.connect();
+  await until(() => releaseWrite !== undefined);
+  const restarting = app.start({ ...CONFIG, address: '192.168.1.51' });
+  await clock.settle();
+  releaseWrite();
+  await restarting;
+  await connecting;
+  await app.reading;
+  assert.ok(
+    gw.calls.every((c) => new URL(c.url).hostname !== ADDRESS),
+    'the old address never asked',
+  );
+});
+
+test('the Discovery keeps every created feature, those not given lately and those unknown', async (t) => {
+  gw = installFetch();
+  const created = createdDevice();
+  created.features.push({
+    ...created.features[0],
+    name: 'A field of a later version',
+    external_id: F('later_field'),
+  });
+  const { gladys } = await setup(t, { devices: [created] });
+  const ids = gladys.fake.discoveredDevices[0].features.map((f) => f.external_id);
+  assert.ok(ids.includes(F('pm25')), 'created, never given by this gateway');
+  assert.ok(ids.includes(F('later_field')), 'created, unknown to this version');
+  assert.ok(ids.includes(F('temperature')));
+});
+
+test('refused credentials typed again after a field was emptied are not sent again', async (t) => {
+  gw = installFetch(() => text('', 401));
+  const { gladys, clock } = await setup(t);
+  await gladys.fake.configUpdated({ ...CONFIG, username: '' });
+  await gladys.fake.configUpdated(CONFIG);
+  await clock.advance(10 * MINUTE);
+  assert.equal(gw.calls.length, 1);
+  assert.match(status(gladys).message.en, /refuses/);
+});
+
+test('after a success, the 429 pause starts again from 1 minute', async (t) => {
+  gw = installFetch(() => text('', 429));
+  const { clock } = await setup(t);
+  await clock.advance(MINUTE + SECOND);
+  assert.equal(gw.calls.length, 2);
+  gw.handler = undefined;
+  await clock.advance(2 * MINUTE + SECOND);
+  assert.equal(gw.calls.length, 3);
+  gw.handler = () => text('', 429);
+  await clock.advance(MINUTE + SECOND);
+  assert.equal(gw.calls.length, 4);
+  await clock.advance(MINUTE + SECOND);
+  assert.equal(gw.calls.length, 5, 'one minute, not four');
+});
+
+test('a reconnection publishes the Discovery list again (Gladys may have restarted)', async (t) => {
+  gw = installFetch();
+  const { app, gladys } = await setup(t);
+  const spy = t.mock.method(gladys, 'publishDiscoveredDevices');
+  await app.connected();
+  assert.equal(spy.mock.callCount(), 1);
+});
+
+test('with a 1-minute interval a reading stays current 5 minutes (the floor)', async (t) => {
+  gw = installFetch();
+  const { gladys, clock } = await setup(t);
+  gw.handler = () => {
+    throw new TypeError('fetch failed');
+  };
+  await clock.advance(4 * MINUTE);
+  await gladys.fake.deviceCreated(createdDevice());
+  assert.equal(gladys.fake.lastState(F('temperature')), 12.3);
+});
+
+test('outdoor temperatures are probes (out of the room average); the indoor one is not', async (t) => {
+  gw = installFetch();
+  const { gladys } = await setup(t);
+  const type = (key) =>
+    gladys.fake.discoveredDevices[0].features.find((f) => f.external_id === F(key)).type;
+  for (const key of ['temperature', 'dew_point', 'wind_chill', 'extra_temperature_1']) {
+    assert.equal(type(key), 'probe', key);
+  }
+  assert.equal(type('indoor_temperature'), 'decimal');
 });

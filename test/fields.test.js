@@ -110,6 +110,14 @@ test('the answer: a name with a control or non-ASCII character is dropped, a lon
   assert.equal(answer.platform.length, 40);
 });
 
+test('a humidity of 0 % is a console without a sensor: unknown; a wind direction of 0 is north', () => {
+  const answer = parseAnswer(
+    fill(templateText(), { ...SENSORS, 'th0hum-act': '0.0', 'wind0dir-act': '0.0' }),
+  );
+  assert.equal(answer.values.humidity, undefined);
+  assert.equal(answer.values.wind_direction, 0);
+});
+
 test('the bounds: a value out of range is left out, never clamped', () => {
   const answer = parseAnswer(
     fill(templateText(), {

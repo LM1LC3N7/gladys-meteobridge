@@ -114,3 +114,30 @@ test('a body that stalls after its headers: the timeout covers the body read', a
   });
   await assert.rejects(getText(`http://${gw.address}/`, { timeout: 200 }), /timeout/);
 });
+
+test('Retry-After: seconds, or a date against the answer Date header (never our clock)', async () => {
+  const { retryAfterMs } = await import('../src/http.js');
+  assert.equal(retryAfterMs('120'), 120_000);
+  assert.equal(
+    retryAfterMs('Sun, 15 Nov 2026 10:05:00 GMT', 'Sun, 15 Nov 2026 10:00:00 GMT'),
+    5 * 60_000,
+  );
+  assert.equal(retryAfterMs('Sun, 15 Nov 2026 10:05:00 GMT'), undefined, 'no Date: ignored');
+  assert.equal(retryAfterMs('Sun, 15 Nov 2099 10:05:00 GMT', 'garbage'), undefined);
+  assert.equal(retryAfterMs(undefined), undefined);
+  assert.equal(retryAfterMs('soon'), undefined);
+});
+
+test('the request timeout is 10 s (the test button answers within 60 s)', async () => {
+  const { HTTP_TIMEOUT } = await import('../src/constants.js');
+  assert.equal(HTTP_TIMEOUT, 10_000);
+});
+
+test('an abort by the caller stops the request in flight', async (t) => {
+  const gw = await server(t, () => {});
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), 100);
+  const started = Date.now();
+  await assert.rejects(getText(`http://${gw.address}/`, { signal: controller.signal }), /stopped/);
+  assert.ok(Date.now() - started < 3000);
+});

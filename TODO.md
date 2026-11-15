@@ -15,7 +15,13 @@
 - [ ] `mbsystem-mac` is filled on every model and firmware (the device id
       depends on it; without it the answer is refused as "not a Meteobridge").
 - [ ] The `act` selector of the `*lowbat` sensors, and `rain0total-sumday`
-      (documented, never seen).
+      (documented, never seen). The rain of the day is gated by
+      `rain0rate-act` (the wiki reads the cumulative `rain0total` with sum
+      selectors only): check that a gauge out of range writes `--` there.
+- [ ] `wind0wind`: the wiki says "wind speed"; shown as the gust (the average
+      is `wind0avgwind`). `air0pm`: the wiki says "pollution in µg/m³"; shown
+      as PM2.5. The extra sensors `th1` to `th8` are not in the wiki table
+      (it lists `t0temp`); confirm their names on a gateway with extra sensors.
 - [ ] What the gateway answers to wrong credentials (401 expected) and while it
       restarts (5xx or no answer).
 - [ ] Whether the value of `mbsystem-station` is a usable device name.
@@ -28,6 +34,13 @@
       leaf wetness have no core unit.
 - [ ] Several gateways in one integration (one today).
 - [ ] HTTPS, if a model offers it.
+
+## Review r1, minor points left (low stakes, behaviour kept)
+
+- [ ] Tests for: the error body cancelled on an HTTP error, the /data
+      sanitizing (pause bound, `failures` bound, salt, unknown fields), the
+      30-minute heartbeat, the pause kept after a refusal, the status not
+      sent twice, a /data write that outlives its bound.
 
 ## Decisions
 
@@ -44,10 +57,22 @@
   converted, to the units the core lists.
 - Freshness: `act` values only (the gateway writes `--` past the hold time of a
   sensor); the rain of the day (`sumday`, which never goes invalid) is gated by
-  `rain0total-act`. No source timestamp is read (one request, no `lasttime` per
+  `rain0rate-act` (review r1: `act` is not a selector of the cumulative
+  `rain0total`). No source timestamp is read (one request, no `lasttime` per
   sensor): a reading is published for 2 intervals (5 min to 2 h), dated when it
   goes to a device created more than a minute after it, and never after a
   restart.
+- Outdoor temperature, dew point, wind chill and the extra sensors are
+  `probe` (out of the room temperature average of the core); only the indoor
+  temperature is `decimal` (review r1).
+- Humidity 0 % is left out (a console without a sensor); a wind direction of
+  0 is north, kept.
+- Addresses: validated through the WHATWG URL parser (what fetch uses); only
+  the canonical dotted IPv4 form is accepted, never 0.0.0.0/8, multicast nor
+  broadcast (hex and integer forms included).
+- `connected()`: an epoch ended by stop(), shutdown() and a saved
+  configuration; a late `getConfig()` neither starts the module nor arms a
+  retry.
 - Identity: the MAC address of the gateway (`mbsystem-mac`); another MAC at the
   same address is another device.
 - Refusal (401 only, the one page read): stop, no automatic try; lifted by new

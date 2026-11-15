@@ -104,8 +104,8 @@
   {
     "name": "config: getConfig failure not retried",
     "file": "src/app.js",
-    "from": "this.configTimer = this.timers.setTimeout(() => this.connected().catch(() => {}), delay);",
-    "to": ""
+    "from": "}, delay);",
+    "to": "}, delay * 1000);"
   },
   {
     "name": "config: password sent without user",
@@ -184,5 +184,113 @@
     "file": "src/app.js",
     "from": "due = this.attemptMono + (this.soon ? MIN_GAP : this.intervalMs());",
     "to": "due = this.attemptMono + this.intervalMs();"
+  },
+  {
+    "name": "r1: tag always 0 (test must fail, never hang)",
+    "file": "src/app.js",
+    "from": ".digest()[0];",
+    "to": ".digest()[0] & 0;"
+  },
+  {
+    "name": "r1: retry armed after stop",
+    "file": "src/app.js",
+    "from": "      // Stopped meanwhile (disconnection, shutdown): no retry armed.\n      if (epoch !== this.epoch) {",
+    "to": "      if (false) {"
+  },
+  {
+    "name": "r1: start before serialize check",
+    "file": "src/app.js",
+    "from": "      if (epoch !== this.epoch) {\n        return undefined;\n      }\n",
+    "to": ""
+  },
+  {
+    "name": "r1: retry delay not doubled",
+    "file": "src/app.js",
+    "from": "this.configDelay * 2)",
+    "to": "this.configDelay)"
+  },
+  {
+    "name": "r1: retry delay not reset",
+    "file": "src/app.js",
+    "from": "      this.configDelay = CONFIG_RETRY_MIN;\n      return this.doStart(raw);",
+    "to": "      return this.doStart(raw);"
+  },
+  {
+    "name": "r1: abort signal not passed",
+    "file": "src/app.js",
+    "from": "signal: abort.signal });",
+    "to": "signal: undefined });"
+  },
+  {
+    "name": "r1: http abort listener",
+    "file": "src/http.js",
+    "from": "  signal?.addEventListener('abort', onAbort, { once: true });\n",
+    "to": ""
+  },
+  {
+    "name": "r1: HTTP timeout 600 s",
+    "file": "src/constants.js",
+    "from": "export const HTTP_TIMEOUT = 10 * SECOND;",
+    "to": "export const HTTP_TIMEOUT = 600 * SECOND;"
+  },
+  {
+    "name": "r1: Retry-After date vs our clock",
+    "file": "src/http.js",
+    "from": "return Math.max(0, until - at);",
+    "to": "return Math.max(0, until - Date.now());"
+  },
+  {
+    "name": "r1: Retry-After date without Date",
+    "file": "src/http.js",
+    "from": "if (Number.isNaN(until) || Number.isNaN(at)) {",
+    "to": "if (Number.isNaN(until)) {"
+  },
+  {
+    "name": "r1: created features dropped",
+    "file": "src/fields.js",
+    "from": "fields.has(key) || createdIds.has(ids.feature(key))",
+    "to": "fields.has(key)"
+  },
+  {
+    "name": "r1: unknown created features dropped",
+    "file": "src/fields.js",
+    "from": "if (key && !FIELD_KEYS.has(key)) {",
+    "to": "if (false) {"
+  },
+  {
+    "name": "r1: hex address accepted",
+    "file": "src/config.js",
+    "from": "return host === value && !forbiddenIpv4(host)",
+    "to": "return !forbiddenIpv4(host)"
+  },
+  {
+    "name": "r1: humidity 0 published",
+    "file": "src/fields.js",
+    "from": "    min: 1,",
+    "to": "    min: 0,"
+  },
+  {
+    "name": "r1: generation not checked after save()",
+    "file": "src/app.js",
+    "from": "    const saved = await this.store.save({ ...this.persisted(), attempt_at: attemptAt });\n    if (generation !== this.generation) {",
+    "to": "    const saved = await this.store.save({ ...this.persisted(), attempt_at: attemptAt });\n    if (false) {"
+  },
+  {
+    "name": "r1: refusal lost after a config error",
+    "file": "src/app.js",
+    "from": "    if (this.config.error) {\n      // The last usable",
+    "to": "    if (this.config.error) {\n      this.credKey = '';\n      // The last usable"
+  },
+  {
+    "name": "r1: outdoor temperature not a probe",
+    "file": "src/fields.js",
+    "from": "['temperature', 'th0temp-act', 'probe',",
+    "to": "['temperature', 'th0temp-act', 'temperature',"
+  },
+  {
+    "name": "r1: rain gate removed",
+    "file": "src/fields.js",
+    "from": "'Rain today', 'rain0rate-act']",
+    "to": "'Rain today']"
   }
 ]

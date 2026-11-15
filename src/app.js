@@ -89,6 +89,7 @@ export class MeteobridgeApp {
     this.dataTimer = undefined;
     this.configTimer = undefined;
     this.configDelay = CONFIG_RETRY_MIN;
+    this.epoch = 0;
     this.readDueMono = undefined;
     // The pace in this process: the monotonic instants of the last attempt
     // and of the end of a pause (from /data's wall times at the first load only).
@@ -104,8 +105,14 @@ export class MeteobridgeApp {
 
   // --- Lifecycle -------------------------------------------------------------
 
-  /** The `connected` event: read the config, retried without end if it fails. */
+  /**
+   * The `connected` event: read the config, retried without end if it
+   * fails. `stop()`, `shutdown()` and a configuration saved meanwhile end
+   * the epoch: a late answer of `getConfig()` then neither starts the module
+   * nor arms a retry.
+   */
   async connected() {
+    const epoch = ++this.epoch;
     // Gladys keeps the status and the Discovery list in memory only: after
     // its restart, both are said again.
     this.lastStatus = undefined;
@@ -118,30 +125,53 @@ export class MeteobridgeApp {
     } catch (err) {
       this.logger.warn(`Reading the configuration failed (${err?.name ?? 'Error'})`);
       await this.setStatus(false, T.configUnreadable);
+      // Stopped meanwhile (disconnection, shutdown): no retry armed.
+      if (epoch !== this.epoch) {
+        return;
+      }
       const delay = this.configDelay;
       this.configDelay = Math.min(CONFIG_RETRY_MAX, this.configDelay * 2);
-      this.configTimer = this.timers.setTimeout(() => this.connected().catch(() => {}), delay);
+      this.configTimer = this.timers.setTimeout(() => {
+        this.configTimer = undefined;
+        if (epoch === this.epoch) {
+          this.connected().catch(() => {});
+        }
+      }, delay);
       return;
     }
-    this.configDelay = CONFIG_RETRY_MIN;
-    await this.start(raw);
+    // Checked when the start really runs: a stop() or a configuration saved
+    // meanwhile (even one queued before it) ends this epoch.
+    await this.serialize(() => {
+      if (epoch !== this.epoch) {
+        return undefined;
+      }
+      this.configDelay = CONFIG_RETRY_MIN;
+      return this.doStart(raw);
+    });
   }
 
+  /** A configuration saved by the user: it wins over a `connected()` still waiting. */
   start(raw = {}) {
+    this.endEpoch();
     return this.serialize(() => this.doStart(raw));
   }
 
-  stop() {
+  /** Ends a pending `connected()` and its retry timer. */
+  endEpoch() {
+    this.epoch += 1;
     this.timers.clearTimeout(this.configTimer);
     this.configTimer = undefined;
+  }
+
+  stop() {
+    this.endEpoch();
     return this.serialize(() => this.doStop());
   }
 
   /** The container stops: the timers dropped, the state written (bounded). */
   shutdown() {
+    this.endEpoch();
     return this.serialize(async () => {
-      this.timers.clearTimeout(this.configTimer);
-      this.configTimer = undefined;
       await this.doStop();
       if (this.state) {
         await this.store.save(this.persisted());
@@ -160,6 +190,12 @@ export class MeteobridgeApp {
     const generation = ++this.generation;
     const previousKey = this.credKey;
     this.config = normalizeConfig(raw);
+    if (this.config.error) {
+      // The last usable credentials stay the reference: the same refused
+      // ones typed again after a field was emptied are not tried again.
+      await this.setStatus(false, T.configError(this.config.error));
+      return;
+    }
     const key = credentialsKey(this.config);
     // New credentials or a new address in this process: always tried, soon
     // (a restart compares the 8-bit tag of /data instead).
@@ -175,10 +211,6 @@ export class MeteobridgeApp {
       }
     }
     this.credKey = key;
-    if (this.config.error) {
-      await this.setStatus(false, T.configError(this.config.error));
-      return;
-    }
     await this.loadData(generation);
   }
 

@@ -20,6 +20,15 @@ test('addresses: IPv4 or host name, optional port; nothing else', () => {
     'h:65536',
     'host\r\nx',
     '-bad.lan',
+    '0xffffffff',
+    '0xe0.1',
+    '0x0',
+    '1.2.3.0xff',
+    '3232235826',
+    '0300.0250.1.1',
+    '192.168.1',
+    '010.1.1.1',
+    'gateway.123',
   ]) {
     assert.equal(parseAddress(bad), null, bad);
   }
@@ -37,6 +46,10 @@ test('configuration: each missing or bad field gives its error; a password never
   assert.equal(normalizeConfig({ ...ok, password: 'a\nb' }).error, 'password_invalid');
   assert.equal(normalizeConfig({ ...ok, password: 'x'.repeat(129) }).error, 'password_invalid');
   assert.equal(normalizeConfig({ ...ok, password: 'pässwörd' }).error, undefined);
+  assert.equal(normalizeConfig({ ...ok, username: 'u'.repeat(64) }).error, undefined);
+  assert.equal(normalizeConfig({ ...ok, username: 'u'.repeat(65) }).error, 'username_invalid');
+  assert.equal(normalizeConfig({ ...ok, password: 'é'.repeat(64) }).error, undefined, '128 bytes');
+  assert.equal(normalizeConfig({ ...ok, password: 'é'.repeat(65) }).error, 'password_invalid');
   assert.equal(credentialsKey(normalizeConfig({})), '');
 });
 
