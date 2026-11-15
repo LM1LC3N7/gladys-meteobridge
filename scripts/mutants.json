@@ -1,0 +1,188 @@
+[
+  {
+    "name": "refusal: periodic read ignores it",
+    "file": "src/app.js",
+    "from": "if (state.refused && !manual) {",
+    "to": "if (false) {"
+  },
+  {
+    "name": "refusal: timer still armed",
+    "file": "src/app.js",
+    "from": "if (!state || state.refused || this.config.error) {\n      return Infinity;",
+    "to": "if (!state || this.config.error) {\n      return Infinity;"
+  },
+  {
+    "name": "refusal: tag of /data not compared",
+    "file": "src/app.js",
+    "from": "if (!this.credsChanged && tagOf(refused.salt, this.config) === refused.tag) {",
+    "to": "if (!this.credsChanged) {"
+  },
+  {
+    "name": "refusal: 403 taken as a refusal",
+    "file": "src/meteobridge.js",
+    "from": "throw new SourceError('denied', { status });",
+    "to": "throw new SourceError('refused', { status });"
+  },
+  {
+    "name": "/data: read without its attempt on disk",
+    "file": "src/app.js",
+    "from": "    if (!saved) {",
+    "to": "    if (false) {"
+  },
+  {
+    "name": "/data: future attempt time trusted",
+    "file": "src/app.js",
+    "from": "raw.attempt_at > wall + SKEW ? wall : raw.attempt_at",
+    "to": "raw.attempt_at"
+  },
+  {
+    "name": "/data: pause forgotten at restart",
+    "file": "src/app.js",
+    "from": "if (this.pauseMono === undefined && this.state.pause_until > wall) {",
+    "to": "if (false) {"
+  },
+  {
+    "name": "pace: early timer reads",
+    "file": "src/app.js",
+    "from": "      if (left > 0) {",
+    "to": "      if (false) {"
+  },
+  {
+    "name": "pace: interval ignored after restart",
+    "file": "src/app.js",
+    "from": "this.attemptMono = mono - Math.max(0, wall - this.state.attempt_at);",
+    "to": "this.attemptMono = undefined;"
+  },
+  {
+    "name": "pause: no upper bound",
+    "file": "src/app.js",
+    "from": "        PAUSE_MIN,\n        PAUSE_MAX,\n",
+    "to": "        PAUSE_MIN,\n        Infinity,\n"
+  },
+  {
+    "name": "pause: no doubling",
+    "file": "src/app.js",
+    "from": "PAUSE_MIN * 2 ** (state.failures - 1)",
+    "to": "PAUSE_MIN"
+  },
+  {
+    "name": "pause: Retry-After ignored",
+    "file": "src/app.js",
+    "from": "error.retryAfterMs ?? PAUSE_MIN",
+    "to": "PAUSE_MIN"
+  },
+  {
+    "name": "freshness: stale reading published",
+    "file": "src/app.js",
+    "from": "return age <= this.freshMs() ? { ...last, age } : undefined;",
+    "to": "return { ...last, age };"
+  },
+  {
+    "name": "freshness: late reading undated",
+    "file": "src/app.js",
+    "from": "reading.age > MINUTE ?",
+    "to": "false ?"
+  },
+  {
+    "name": "identity: another MAC merged",
+    "file": "src/app.js",
+    "from": "if (!state.gateway || state.gateway.mac !== answer.mac) {",
+    "to": "if (!state.gateway) {"
+  },
+  {
+    "name": "identity: old reading given to new MAC",
+    "file": "src/app.js",
+    "from": "if (!last || last.mac !== this.state?.gateway?.mac) {",
+    "to": "if (!last) {"
+  },
+  {
+    "name": "stop: late answer published",
+    "file": "src/app.js",
+    "from": "if (abort.signal.aborted || generation !== this.generation) {",
+    "to": "if (false) {"
+  },
+  {
+    "name": "config: getConfig failure not retried",
+    "file": "src/app.js",
+    "from": "this.configTimer = this.timers.setTimeout(() => this.connected().catch(() => {}), delay);",
+    "to": ""
+  },
+  {
+    "name": "config: password sent without user",
+    "file": "src/config.js",
+    "from": "  } else if (!username) {",
+    "to": "  } else if (false) {"
+  },
+  {
+    "name": "config: ':' in user name",
+    "file": "src/config.js",
+    "from": "username.includes(':') || ",
+    "to": ""
+  },
+  {
+    "name": "values: rain of the day not gated",
+    "file": "src/fields.js",
+    "from": "if (gate && parseNumber(byTag.get(gate)) === null) {",
+    "to": "if (false) {"
+  },
+  {
+    "name": "values: bounds dropped",
+    "file": "src/fields.js",
+    "from": "if (Number.isFinite(value) && value >= kind.min && value <= kind.max) {",
+    "to": "if (Number.isFinite(value)) {"
+  },
+  {
+    "name": "values: loose number parse",
+    "file": "src/fields.js",
+    "from": "if (typeof text !== 'string' || !/^-?\\d{1,7}(\\.\\d{1,4})?$/.test(text)) {",
+    "to": "if (typeof text !== 'string' || text.trim() === '--') {"
+  },
+  {
+    "name": "values: wind not converted",
+    "file": "src/fields.js",
+    "from": "convert: (v) => round(v * 3.6, 1),",
+    "to": "convert: (v) => round(v, 1),"
+  },
+  {
+    "name": "values: battery flag any value",
+    "file": "src/fields.js",
+    "from": "convert: (v) => (v === 0 || v === 1 ? v : NaN),",
+    "to": "convert: (v) => v,"
+  },
+  {
+    "name": "answer: marker not checked",
+    "file": "src/fields.js",
+    "from": "if (lines[0]?.trim() !== MARKER) {",
+    "to": "if (false) {"
+  },
+  {
+    "name": "answer: no MAC accepted",
+    "file": "src/fields.js",
+    "from": "  if (!mac) {\n    return { ok: false, why: 'identity' };",
+    "to": "  if (false) {\n    return { ok: false, why: 'identity' };"
+  },
+  {
+    "name": "http: redirect followed",
+    "file": "src/http.js",
+    "from": "redirect: 'manual',",
+    "to": "redirect: 'follow',"
+  },
+  {
+    "name": "http: body unbounded",
+    "file": "src/http.js",
+    "from": "    if (size > limit) {",
+    "to": "    if (false) {"
+  },
+  {
+    "name": "http: 3xx accepted",
+    "file": "src/http.js",
+    "from": "if (!(response.status >= 200 && response.status < 300)) {",
+    "to": "if (response.status >= 400) {"
+  },
+  {
+    "name": "soon: new credentials wait the interval",
+    "file": "src/app.js",
+    "from": "due = this.attemptMono + (this.soon ? MIN_GAP : this.intervalMs());",
+    "to": "due = this.attemptMono + this.intervalMs();"
+  }
+]
