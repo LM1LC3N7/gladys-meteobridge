@@ -86,3 +86,4 @@
 - No `keywords` in the manifest (Louis's rule); `countries` absent (worldwide);
   category `environment`.
 - No `poll_frequency`: the module reads at its own pace (`should_poll: false`).
+- [ ] r2 mineurs : tests pour shutdown() sans endEpoch() et endEpoch() sans clearTimeout.
