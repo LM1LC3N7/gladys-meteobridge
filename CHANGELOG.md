@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-15
+
 ### Added
 
 - The weather station behind your Meteobridge gateway in Gladys, read only, on
@@ -20,3 +22,6 @@ the notes of the version's GitHub Release.
   sensor not heard stays unknown, never 0. Refused credentials are never sent
   again by themselves; a busy gateway gets a pause. Never tested with a real
   Meteobridge yet.
+
+[Unreleased]: https://github.com/LM1LC3N7/gladys-meteobridge/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/LM1LC3N7/gladys-meteobridge/releases/tag/v0.1.1

@@ -1,6 +1,6 @@
 {
   "name": "gladys-meteobridge",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Gladys Assistant external integration for the weather station behind a Meteobridge gateway: read locally through its template page (HTTP, Basic authentication), one device per gateway. Read only.",
   "type": "module",
